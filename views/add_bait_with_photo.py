@@ -10,7 +10,9 @@ from storage.config import load_keys
 def add_bait_with_photo_screen(page: ft.Page, on_back):
     """Экран добавления насадки с фото"""
     
-    photo_path_input = ft.TextField(label="Путь к фото (полный путь к файлу)", width=400, hint_text="C:\\photos\\bait.jpg")
+    selected_photo_path = None
+    image_preview = ft.Image(src="", width=200, height=200, visible=False)
+    photo_path_input = ft.TextField(label="Путь к фото (или выберите ниже)", width=400, read_only=True)
     
     name_input = ft.TextField(label="Название насадки *", width=400)
     bait_type_input = ft.TextField(label="Тип (тесто/сухая смесь/жидкость)", width=200)
@@ -23,6 +25,23 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
     
     status_text = ft.Text("", color=ft.Colors.BLUE)
     
+    # Файловый пикер
+    file_picker = ft.FilePicker(on_result=lambda e: on_file_picked(e))
+    page.overlay.append(file_picker)
+    
+    def on_file_picked(result):
+        nonlocal selected_photo_path
+        if result and result.files:
+            selected_photo_path = result.files[0].path
+            photo_path_input.value = selected_photo_path
+            image_preview.src = selected_photo_path
+            image_preview.visible = True
+            status_text.value = f"✅ Фото выбрано: {os.path.basename(selected_photo_path)}"
+            page.update()
+    
+    def pick_photo(e):
+        file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)
+    
     def save_bait(e):
         if not name_input.value:
             status_text.value = "❌ Введите название насадки"
@@ -30,12 +49,11 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
             return
         
         saved_photo_path = None
-        photo_path = photo_path_input.value
-        if photo_path and os.path.exists(photo_path):
+        if selected_photo_path and os.path.exists(selected_photo_path):
             os.makedirs("assets/baits", exist_ok=True)
             filename = f"bait_{int(datetime.now().timestamp())}.jpg"
             saved_photo_path = f"assets/baits/{filename}"
-            shutil.copy2(photo_path, saved_photo_path)
+            shutil.copy2(selected_photo_path, saved_photo_path)
         
         add_bait(
             name=name_input.value,
@@ -59,16 +77,14 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         color_input.value = ""
         notes_input.value = ""
         photo_path_input.value = ""
+        image_preview.visible = False
+        selected_photo_path = None
         page.update()
     
     def analyze_photo(e):
-        if not photo_path_input.value:
-            status_text.value = "❌ Сначала укажите путь к фото"
-            page.update()
-            return
-        
-        if not os.path.exists(photo_path_input.value):
-            status_text.value = "❌ Файл не найден"
+        nonlocal selected_photo_path
+        if not selected_photo_path:
+            status_text.value = "❌ Сначала выберите фото"
             page.update()
             return
         
@@ -82,9 +98,9 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
             page.update()
             return
         
-        analysis = analyze_bait_image(photo_path_input.value, openrouter_key)
+        analysis = analyze_bait_image(selected_photo_path, openrouter_key)
         
-        # ---- ДИАЛОГ С СОВЕТОМ ОТ ИИ ----
+        # Диалог с советом от ИИ
         def close_advice_dialog():
             advice_dialog.open = False
             if advice_dialog in page.overlay:
@@ -109,17 +125,14 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         advice_dialog.open = True
         page.update()
         
-        # ---- ОСНОВНАЯ ЛОГИКА ПОСЛЕ ЗАКРЫТИЯ СОВЕТА ----
         def continue_with_parsing():
             try:
-                # Парсим JSON из ответа
                 json_start = analysis.find('{')
                 json_end = analysis.rfind('}') + 1
                 if json_start != -1 and json_end != 0:
                     json_str = analysis[json_start:json_end]
                     data = json.loads(json_str)
                     
-                    # Заполняем поля из данных ИИ
                     if data.get("name"):
                         name_input.value = data.get("name")
                     if data.get("bait_type"):
@@ -143,7 +156,7 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
                     if notes_lines:
                         notes_input.value = "\n".join(notes_lines)
                     
-                    # ---- ДИАЛОГ РЕДАКТИРОВАНИЯ ----
+                    # Диалог редактирования
                     name_field = ft.TextField(label="Название", value=name_input.value, width=400)
                     type_field = ft.TextField(label="Тип", value=bait_type_input.value, width=400)
                     flavor_field = ft.TextField(label="Аромат", value=flavor_input.value, width=400)
@@ -165,11 +178,11 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
                         
                         try:
                             saved_photo_path = None
-                            if photo_path_input.value and os.path.exists(photo_path_input.value):
+                            if selected_photo_path and os.path.exists(selected_photo_path):
                                 os.makedirs("assets/baits", exist_ok=True)
                                 filename = f"bait_{int(datetime.now().timestamp())}.jpg"
                                 saved_photo_path = f"assets/baits/{filename}"
-                                shutil.copy2(photo_path_input.value, saved_photo_path)
+                                shutil.copy2(selected_photo_path, saved_photo_path)
                             
                             add_bait(
                                 name=name_input.value,
@@ -221,6 +234,7 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
                 page.update()
     
     back_button = ft.TextButton("← Назад", on_click=lambda e: on_back())
+    pick_button = ft.FilledButton("📷 Выбрать фото", on_click=pick_photo)
     save_button = ft.FilledButton("💾 Сохранить насадку", on_click=save_bait)
     analyze_button = ft.FilledButton("🤖 Распознать через ИИ", on_click=analyze_photo)
     
@@ -231,7 +245,8 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
                 back_button,
                 ft.Text("Добавить насадку с фото", size=28, weight=ft.FontWeight.BOLD),
                 ft.Divider(),
-                ft.Text("Укажите путь к файлу с фотографией насадки:", size=14),
+                pick_button,
+                image_preview,
                 photo_path_input,
                 ft.Row([save_button, analyze_button], alignment=ft.MainAxisAlignment.CENTER, wrap=True),
                 ft.Divider(),
