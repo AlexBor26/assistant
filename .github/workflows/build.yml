@@ -7,15 +7,11 @@ on:
       - '**.md'
       - '.gitignore'
       - 'docs/**'
-  workflow_dispatch: # Позволяет запускать сборку вручную из вкладки Actions
+  workflow_dispatch:
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    env:
-      # Переменные окружения для Android SDK
-      ANDROID_HOME: ${{ env.ANDROID_HOME }}
-      ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
 
     steps:
       - name: 📥 Checkout кода
@@ -41,7 +37,7 @@ jobs:
           yes | sdkmanager --licenses || true
 
       - name: ⚡ Кэширование Gradle
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
@@ -52,15 +48,11 @@ jobs:
 
       - name: 🏗 Сборка APK через Flet
         run: flet build android --release
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
 
       - name: 📦 Загрузка артефакта
         uses: actions/upload-artifact@v4
         with:
           name: fishing-bait-app-${{ github.run_number }}
-          # Flet помещает APK в эту директорию (Flutter-бэкенд)
           path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: warn
           retention-days: 30
