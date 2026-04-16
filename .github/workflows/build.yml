@@ -1,31 +1,66 @@
-name: Build APK
+name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'docs/**'
+  workflow_dispatch: # Позволяет запускать сборку вручную из вкладки Actions
 
 jobs:
-  build:
+  build-android:
     runs-on: ubuntu-latest
+    env:
+      # Переменные окружения для Android SDK
+      ANDROID_HOME: ${{ env.ANDROID_HOME }}
+      ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Python
+      - name: 📥 Checkout кода
+        uses: actions/checkout@v4
+
+      - name: 🐍 Настройка Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
-      - name: Install dependencies
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: 📦 Установка зависимостей
         run: |
-          pip install flet requests pillow
-      
-      - name: Build APK
+          python -m pip install --upgrade pip
+          pip install flet>=0.25.0 pillow openai
+
+      - name: 🤖 Настройка Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 🛠 Установка SDK, Build Tools и NDK
         run: |
-          echo "y" | flet build apk
-      
-      - name: Upload APK
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653" "cmdline-tools;latest"
+          yes | sdkmanager --licenses || true
+
+      - name: ⚡ Кэширование Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: 🏗 Сборка APK через Flet
+        run: flet build android --release
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+
+      - name: 📦 Загрузка артефакта
         uses: actions/upload-artifact@v4
         with:
-          name: assistant-apk
-          path: build/apk/*.apk
+          name: fishing-bait-app-${{ github.run_number }}
+          # Flet помещает APK в эту директорию (Flutter-бэкенд)
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: warn
+          retention-days: 30
