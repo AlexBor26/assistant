@@ -11,8 +11,7 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
     """Экран добавления насадки с фото"""
     
     selected_photo_path = None
-    image_preview = ft.Image(src="", width=200, height=200, visible=False)
-    photo_path_input = ft.TextField(label="Путь к фото (или выберите ниже)", width=400, read_only=True)
+    photo_path_input = ft.TextField(label="Путь к фото", width=400, read_only=True)
     
     name_input = ft.TextField(label="Название насадки *", width=400)
     bait_type_input = ft.TextField(label="Тип (тесто/сухая смесь/жидкость)", width=200)
@@ -34,8 +33,6 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         if result and result.files:
             selected_photo_path = result.files[0].path
             photo_path_input.value = selected_photo_path
-            image_preview.src = selected_photo_path
-            image_preview.visible = True
             status_text.value = f"✅ Фото выбрано: {os.path.basename(selected_photo_path)}"
             page.update()
     
@@ -77,7 +74,6 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         color_input.value = ""
         notes_input.value = ""
         photo_path_input.value = ""
-        image_preview.visible = False
         selected_photo_path = None
         page.update()
     
@@ -100,7 +96,6 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         
         analysis = analyze_bait_image(selected_photo_path, openrouter_key)
         
-        # Диалог с советом от ИИ
         def close_advice_dialog():
             advice_dialog.open = False
             if advice_dialog in page.overlay:
@@ -156,79 +151,11 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
                     if notes_lines:
                         notes_input.value = "\n".join(notes_lines)
                     
-                    # Диалог редактирования
-                    name_field = ft.TextField(label="Название", value=name_input.value, width=400)
-                    type_field = ft.TextField(label="Тип", value=bait_type_input.value, width=400)
-                    flavor_field = ft.TextField(label="Аромат", value=flavor_input.value, width=400)
-                    brand_field = ft.TextField(label="Производитель", value=manufacturer_input.value, width=400)
-                    season_field = ft.TextField(label="Сезон", value=season_input.value, width=400)
-                    temp_field = ft.TextField(label="Температура воды", value=water_temp_input.value, width=400)
-                    color_field = ft.TextField(label="Цвет", value=color_input.value, width=400)
-                    notes_field = ft.TextField(label="Заметки", value=notes_input.value, width=400, multiline=True)
-                    
-                    def save_from_dialog(e):
-                        name_input.value = name_field.value
-                        bait_type_input.value = type_field.value
-                        flavor_input.value = flavor_field.value
-                        manufacturer_input.value = brand_field.value
-                        season_input.value = season_field.value
-                        water_temp_input.value = temp_field.value
-                        color_input.value = color_field.value
-                        notes_input.value = notes_field.value
-                        
-                        try:
-                            saved_photo_path = None
-                            if selected_photo_path and os.path.exists(selected_photo_path):
-                                os.makedirs("assets/baits", exist_ok=True)
-                                filename = f"bait_{int(datetime.now().timestamp())}.jpg"
-                                saved_photo_path = f"assets/baits/{filename}"
-                                shutil.copy2(selected_photo_path, saved_photo_path)
-                            
-                            add_bait(
-                                name=name_input.value,
-                                bait_type=bait_type_input.value,
-                                flavor=flavor_input.value,
-                                manufacturer=manufacturer_input.value,
-                                season=season_input.value,
-                                water_temp=water_temp_input.value,
-                                color=color_input.value,
-                                notes=notes_input.value,
-                                photo_path=saved_photo_path
-                            )
-                            status_text.value = "✅ Насадка сохранена!"
-                            edit_dialog.open = False
-                            page.overlay.remove(edit_dialog)
-                            page.update()
-                        except Exception as save_err:
-                            status_text.value = f"⚠️ Ошибка: {save_err}"
-                            page.update()
-                    
-                    def close_edit_dialog(e):
-                        edit_dialog.open = False
-                        page.overlay.remove(edit_dialog)
-                        page.update()
-                    
-                    edit_dialog = ft.AlertDialog(
-                        title=ft.Text("Редактирование насадки", size=18),
-                        content=ft.Column([
-                            name_field, type_field, flavor_field, brand_field,
-                            season_field, temp_field, color_field, notes_field
-                        ], spacing=12, height=450, scroll=ft.ScrollMode.AUTO),
-                        actions=[
-                            ft.TextButton("Отмена", on_click=close_edit_dialog),
-                            ft.FilledButton("Сохранить", on_click=save_from_dialog),
-                        ],
-                    )
-                    
-                    page.overlay.append(edit_dialog)
-                    edit_dialog.open = True
+                    status_text.value = "✅ Поля заполнены. Нажмите 'Сохранить насадку'"
                     page.update()
                 else:
                     status_text.value = "⚠️ Не удалось найти JSON в ответе ИИ"
                     page.update()
-            except json.JSONDecodeError as e:
-                status_text.value = f"⚠️ Ошибка разбора JSON: {e}"
-                page.update()
             except Exception as e:
                 status_text.value = f"⚠️ Ошибка: {e}"
                 page.update()
@@ -246,7 +173,6 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
                 ft.Text("Добавить насадку с фото", size=28, weight=ft.FontWeight.BOLD),
                 ft.Divider(),
                 pick_button,
-                image_preview,
                 photo_path_input,
                 ft.Row([save_button, analyze_button], alignment=ft.MainAxisAlignment.CENTER, wrap=True),
                 ft.Divider(),
