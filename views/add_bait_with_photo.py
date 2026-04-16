@@ -10,8 +10,11 @@ from storage.config import load_keys
 def add_bait_with_photo_screen(page: ft.Page, on_back):
     """Экран добавления насадки с фото"""
     
-    selected_photo_path = None
-    photo_path_input = ft.TextField(label="Путь к фото", width=400, read_only=True)
+    photo_path_input = ft.TextField(
+        label="Путь к фото", 
+        width=400, 
+        hint_text="/storage/emulated/0/DCIM/Camera/photo.jpg"
+    )
     
     name_input = ft.TextField(label="Название насадки *", width=400)
     bait_type_input = ft.TextField(label="Тип", width=200)
@@ -22,21 +25,6 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
     
     status_text = ft.Text("", color=ft.Colors.BLUE)
     
-    # Файловый пикер
-    file_picker = ft.FilePicker(on_result=lambda e: on_file_picked(e))
-    page.overlay.append(file_picker)
-    
-    def on_file_picked(result):
-        nonlocal selected_photo_path
-        if result and result.files:
-            selected_photo_path = result.files[0].path
-            photo_path_input.value = selected_photo_path
-            status_text.value = f"✅ Фото: {os.path.basename(selected_photo_path)}"
-            page.update()
-    
-    def pick_photo(e):
-        file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)
-    
     def save_bait(e):
         if not name_input.value:
             status_text.value = "❌ Введите название"
@@ -44,11 +32,17 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
             return
         
         saved_photo_path = None
-        if selected_photo_path and os.path.exists(selected_photo_path):
+        photo_path = photo_path_input.value
+        if photo_path and os.path.exists(photo_path):
             os.makedirs("assets/baits", exist_ok=True)
             filename = f"bait_{int(datetime.now().timestamp())}.jpg"
             saved_photo_path = f"assets/baits/{filename}"
-            shutil.copy2(selected_photo_path, saved_photo_path)
+            shutil.copy2(photo_path, saved_photo_path)
+            status_text.value = f"✅ Фото скопировано"
+        elif photo_path:
+            status_text.value = "⚠️ Файл не найден, проверьте путь"
+            page.update()
+            return
         
         add_bait(
             name=name_input.value,
@@ -70,13 +64,17 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         season_input.value = ""
         notes_input.value = ""
         photo_path_input.value = ""
-        selected_photo_path = None
         page.update()
     
     def analyze_photo(e):
-        nonlocal selected_photo_path
-        if not selected_photo_path:
-            status_text.value = "❌ Сначала выберите фото"
+        photo_path = photo_path_input.value
+        if not photo_path:
+            status_text.value = "❌ Введите путь к фото"
+            page.update()
+            return
+        
+        if not os.path.exists(photo_path):
+            status_text.value = "❌ Файл не найден"
             page.update()
             return
         
@@ -89,7 +87,7 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
             page.update()
             return
         
-        analysis = analyze_bait_image(selected_photo_path, openrouter_key)
+        analysis = analyze_bait_image(photo_path, openrouter_key)
         
         def close_advice_dialog():
             advice_dialog.open = False
@@ -125,16 +123,19 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
                 page.update()
     
     back_button = ft.TextButton("← Назад", on_click=lambda e: on_back())
-    pick_button = ft.FilledButton("📷 Выбрать фото", on_click=pick_photo)
     save_button = ft.FilledButton("💾 Сохранить", on_click=save_bait)
     analyze_button = ft.FilledButton("🤖 Распознать", on_click=analyze_photo)
     
     page.controls.clear()
     page.add(
         ft.Column([
+            ft.Container(height=40),
             back_button,
             ft.Text("Добавить насадку", size=28),
-            pick_button,
+            ft.Text("Как найти путь к фото:", size=12, color=ft.Colors.GREY),
+            ft.Text("1. Откройте фото в галерее → Подробности", size=11, color=ft.Colors.GREY),
+            ft.Text("2. Скопируйте полный путь", size=11, color=ft.Colors.GREY),
+            ft.Divider(),
             photo_path_input,
             name_input,
             ft.Row([bait_type_input, flavor_input], wrap=True),
