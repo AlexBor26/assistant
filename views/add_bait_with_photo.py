@@ -14,12 +14,10 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
     photo_path_input = ft.TextField(label="Путь к фото", width=400, read_only=True)
     
     name_input = ft.TextField(label="Название насадки *", width=400)
-    bait_type_input = ft.TextField(label="Тип (тесто/сухая смесь/жидкость)", width=200)
+    bait_type_input = ft.TextField(label="Тип", width=200)
     flavor_input = ft.TextField(label="Аромат", width=200)
     manufacturer_input = ft.TextField(label="Производитель", width=200)
     season_input = ft.TextField(label="Сезон", width=200)
-    water_temp_input = ft.TextField(label="Температура воды", width=200)
-    color_input = ft.TextField(label="Цвет", width=200)
     notes_input = ft.TextField(label="Заметки", width=400, multiline=True)
     
     status_text = ft.Text("", color=ft.Colors.BLUE)
@@ -33,7 +31,7 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         if result and result.files:
             selected_photo_path = result.files[0].path
             photo_path_input.value = selected_photo_path
-            status_text.value = f"✅ Фото выбрано: {os.path.basename(selected_photo_path)}"
+            status_text.value = f"✅ Фото: {os.path.basename(selected_photo_path)}"
             page.update()
     
     def pick_photo(e):
@@ -41,7 +39,7 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
     
     def save_bait(e):
         if not name_input.value:
-            status_text.value = "❌ Введите название насадки"
+            status_text.value = "❌ Введите название"
             page.update()
             return
         
@@ -58,8 +56,8 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
             flavor=flavor_input.value,
             manufacturer=manufacturer_input.value,
             season=season_input.value,
-            water_temp=water_temp_input.value,
-            color=color_input.value,
+            water_temp="",
+            color="",
             notes=notes_input.value,
             photo_path=saved_photo_path
         )
@@ -70,8 +68,6 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         flavor_input.value = ""
         manufacturer_input.value = ""
         season_input.value = ""
-        water_temp_input.value = ""
-        color_input.value = ""
         notes_input.value = ""
         photo_path_input.value = ""
         selected_photo_path = None
@@ -84,13 +80,12 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
             page.update()
             return
         
-        status_text.value = "🤖 Анализирую фото через ИИ..."
+        status_text.value = "🤖 Анализирую..."
         page.update()
         
         _, openrouter_key = load_keys()
-        
         if not openrouter_key:
-            status_text.value = "❌ Нет API-ключа OpenRouter"
+            status_text.value = "❌ Нет ключа OpenRouter"
             page.update()
             return
         
@@ -98,24 +93,15 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         
         def close_advice_dialog():
             advice_dialog.open = False
-            if advice_dialog in page.overlay:
-                page.overlay.remove(advice_dialog)
+            page.overlay.remove(advice_dialog)
             page.update()
             continue_with_parsing()
         
         advice_dialog = ft.AlertDialog(
-            title=ft.Text("🎣 Совет наставника", size=20),
-            content=ft.Container(
-                content=ft.Text(analysis, size=13, selectable=True),
-                width=550,
-                height=450,
-                padding=15
-            ),
-            actions=[
-                ft.TextButton("Продолжить", on_click=lambda e: close_advice_dialog()),
-            ],
+            title=ft.Text("🎣 Совет", size=20),
+            content=ft.Container(content=ft.Text(analysis, size=13, selectable=True), width=500, height=400, padding=15),
+            actions=[ft.TextButton("Продолжить", on_click=lambda e: close_advice_dialog())],
         )
-        
         page.overlay.append(advice_dialog)
         advice_dialog.open = True
         page.update()
@@ -125,67 +111,37 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
                 json_start = analysis.find('{')
                 json_end = analysis.rfind('}') + 1
                 if json_start != -1 and json_end != 0:
-                    json_str = analysis[json_start:json_end]
-                    data = json.loads(json_str)
-                    
-                    if data.get("name"):
-                        name_input.value = data.get("name")
-                    if data.get("bait_type"):
-                        bait_type_input.value = data.get("bait_type")
-                    if data.get("flavor"):
-                        flavor_input.value = data.get("flavor")
-                    if data.get("brand"):
-                        manufacturer_input.value = data.get("brand")
-                    if data.get("season"):
-                        season_input.value = data.get("season")
-                    if data.get("water_temp"):
-                        water_temp_input.value = data.get("water_temp")
-                    if data.get("color"):
-                        color_input.value = data.get("color")
-                    
-                    notes_lines = []
-                    if data.get("target_fish"):
-                        notes_lines.append(f"Целевая рыба: {data.get('target_fish')}")
-                    if data.get("weight"):
-                        notes_lines.append(f"Вес: {data.get('weight')}")
-                    if notes_lines:
-                        notes_input.value = "\n".join(notes_lines)
-                    
-                    status_text.value = "✅ Поля заполнены. Нажмите 'Сохранить насадку'"
+                    data = json.loads(analysis[json_start:json_end])
+                    if data.get("name"): name_input.value = data.get("name")
+                    if data.get("bait_type"): bait_type_input.value = data.get("bait_type")
+                    if data.get("flavor"): flavor_input.value = data.get("flavor")
+                    if data.get("brand"): manufacturer_input.value = data.get("brand")
+                    if data.get("season"): season_input.value = data.get("season")
+                    if data.get("target_fish"): notes_input.value = f"Целевая рыба: {data.get('target_fish')}"
+                    status_text.value = "✅ Поля заполнены. Нажмите 'Сохранить'"
                     page.update()
-                else:
-                    status_text.value = "⚠️ Не удалось найти JSON в ответе ИИ"
-                    page.update()
-            except Exception as e:
-                status_text.value = f"⚠️ Ошибка: {e}"
+            except Exception as ex:
+                status_text.value = f"⚠️ Ошибка: {ex}"
                 page.update()
     
     back_button = ft.TextButton("← Назад", on_click=lambda e: on_back())
     pick_button = ft.FilledButton("📷 Выбрать фото", on_click=pick_photo)
-    save_button = ft.FilledButton("💾 Сохранить насадку", on_click=save_bait)
-    analyze_button = ft.FilledButton("🤖 Распознать через ИИ", on_click=analyze_photo)
+    save_button = ft.FilledButton("💾 Сохранить", on_click=save_bait)
+    analyze_button = ft.FilledButton("🤖 Распознать", on_click=analyze_photo)
     
     page.controls.clear()
     page.add(
-        ft.ListView(
-            [
-                back_button,
-                ft.Text("Добавить насадку с фото", size=28, weight=ft.FontWeight.BOLD),
-                ft.Divider(),
-                pick_button,
-                photo_path_input,
-                ft.Row([save_button, analyze_button], alignment=ft.MainAxisAlignment.CENTER, wrap=True),
-                ft.Divider(),
-                ft.Text("Или заполните вручную:", size=14, weight=ft.FontWeight.BOLD),
-                name_input,
-                ft.Row([bait_type_input, flavor_input], wrap=True),
-                ft.Row([manufacturer_input, season_input], wrap=True),
-                ft.Row([water_temp_input, color_input], wrap=True),
-                notes_input,
-                status_text,
-            ],
-            spacing=15,
-            expand=True
-        )
+        ft.Column([
+            back_button,
+            ft.Text("Добавить насадку", size=28),
+            pick_button,
+            photo_path_input,
+            name_input,
+            ft.Row([bait_type_input, flavor_input], wrap=True),
+            ft.Row([manufacturer_input, season_input], wrap=True),
+            notes_input,
+            ft.Row([save_button, analyze_button], alignment=ft.MainAxisAlignment.CENTER),
+            status_text,
+        ], spacing=15, scroll=ft.ScrollMode.AUTO)
     )
     page.update()
