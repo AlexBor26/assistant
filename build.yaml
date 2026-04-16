@@ -1,7 +1,3 @@
-name: assistant
-version: 1.0.0
-description: Ассистент рыбака
-
 android:
   package_name: ru.fisher.assistant
   min_sdk_version: 21
