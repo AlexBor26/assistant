@@ -8,60 +8,39 @@ from services.vision import analyze_bait_image
 from storage.config import load_keys
 
 def add_bait_with_photo_screen(page: ft.Page, on_back):
-    """Экран добавления насадки с фото — рабочий на Android"""
+    """Экран добавления насадки с фото"""
     
-    # Хранилище для выбранной папки и имени файла
-    selected_folder = None
-    selected_filename = None
     selected_photo_path = None
-    
-    # Поля ввода
     photo_path_input = ft.TextField(label="Путь к фото", width=400, read_only=True)
+    
     name_input = ft.TextField(label="Название насадки *", width=400)
     bait_type_input = ft.TextField(label="Тип", width=200)
     flavor_input = ft.TextField(label="Аромат", width=200)
     manufacturer_input = ft.TextField(label="Производитель", width=200)
     season_input = ft.TextField(label="Сезон", width=200)
     notes_input = ft.TextField(label="Заметки", width=400, multiline=True)
+    
     status_text = ft.Text("", color=ft.Colors.BLUE)
     
-    # --- Файловые пикеры ---
-    folder_picker = ft.FilePicker(on_result=pick_folder_result)
-    file_picker = ft.FilePicker(on_result=pick_file_result)
-    page.overlay.extend([folder_picker, file_picker])
+    # Файловый пикер
+    file_picker = ft.FilePicker(on_result=on_file_picked)
+    page.overlay.append(file_picker)
     
-    def pick_folder_result(e: ft.FilePickerResultEvent):
-        """Пользователь выбрал папку"""
-        nonlocal selected_folder
-        if e.path:
-            selected_folder = e.path
-            status_text.value = f"📁 Папка: {os.path.basename(selected_folder)}"
+    def on_file_picked(result: ft.FilePickerResultEvent):
+        nonlocal selected_photo_path
+        if result and result.files:
+            selected_photo_path = result.files[0].path
+            photo_path_input.value = selected_photo_path
+            status_text.value = f"✅ Фото: {os.path.basename(selected_photo_path)}"
             page.update()
     
-    def pick_file_result(e: ft.FilePickerResultEvent):
-        """Пользователь выбрал файл — склеиваем путь"""
-        nonlocal selected_filename, selected_photo_path
-        if e.files:
-            selected_filename = e.files[0].name
-            if selected_folder:
-                selected_photo_path = os.path.join(selected_folder, selected_filename)
-                photo_path_input.value = selected_photo_path
-                status_text.value = f"✅ Фото: {selected_filename}"
-            else:
-                status_text.value = "❌ Сначала выберите папку с фото"
+    def pick_photo(e):
+        try:
+            file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)
+        except Exception as ex:
+            status_text.value = f"❌ Ошибка: {ex}"
             page.update()
     
-    def select_folder(e):
-        folder_picker.get_directory_path()
-    
-    def select_file(e):
-        if selected_folder:
-            file_picker.pick_files(allow_multiple=False, allowed_extensions=["jpg", "jpeg", "png"])
-        else:
-            status_text.value = "❌ Сначала выберите папку (кнопка выше)"
-            page.update()
-    
-    # --- Остальные функции (save_bait, analyze_photo) без изменений ---
     def save_bait(e):
         if not name_input.value:
             status_text.value = "❌ Введите название"
@@ -96,8 +75,6 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         notes_input.value = ""
         photo_path_input.value = ""
         selected_photo_path = None
-        selected_folder = None
-        selected_filename = None
         page.update()
     
     def analyze_photo(e):
@@ -126,10 +103,7 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         
         advice_dialog = ft.AlertDialog(
             title=ft.Text("🎣 Совет", size=20),
-            content=ft.Container(
-                content=ft.Text(analysis, size=13, selectable=True),
-                width=500, height=400, padding=15
-            ),
+            content=ft.Container(content=ft.Text(analysis, size=13, selectable=True), width=500, height=400, padding=15),
             actions=[ft.TextButton("Продолжить", on_click=lambda e: close_advice_dialog())],
         )
         page.overlay.append(advice_dialog)
@@ -154,10 +128,8 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
                 status_text.value = f"⚠️ Ошибка: {ex}"
                 page.update()
     
-    # --- Интерфейс ---
     back_button = ft.TextButton("← Назад", on_click=lambda e: on_back())
-    folder_button = ft.FilledButton("📁 Выбрать папку", on_click=select_folder)
-    file_button = ft.FilledButton("📷 Выбрать фото", on_click=select_file)
+    pick_button = ft.FilledButton("📷 Выбрать фото", on_click=pick_photo)
     save_button = ft.FilledButton("💾 Сохранить", on_click=save_bait)
     analyze_button = ft.FilledButton("🤖 Распознать", on_click=analyze_photo)
     
@@ -167,10 +139,7 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
             ft.Container(height=40),
             back_button,
             ft.Text("Добавить насадку", size=28),
-            ft.Text("ШАГ 1: Выберите папку с фото (например, DCIM/Camera)", size=12, color=ft.Colors.GREY),
-            folder_button,
-            ft.Text("ШАГ 2: Выберите файл в этой папке", size=12, color=ft.Colors.GREY),
-            file_button,
+            pick_button,
             photo_path_input,
             name_input,
             ft.Row([bait_type_input, flavor_input], wrap=True),
