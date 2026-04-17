@@ -9,17 +9,14 @@ from storage.database import add_bait
 from services.vision import analyze_bait_image
 from storage.config import load_keys
 
-# Кэш анализа
 analysis_cache = {}
 
 def get_file_hash(filepath):
-    """Хэш для кэширования анализа"""
     stat = os.stat(filepath)
     data = f"{filepath}_{stat.st_size}_{stat.st_mtime}".encode()
     return hashlib.md5(data).hexdigest()
 
 def compress_image(src_path, max_size=800, quality=85):
-    """Сжатие фото"""
     try:
         with Image.open(src_path) as img:
             if img.mode in ('RGBA', 'LA', 'P'):
@@ -39,7 +36,8 @@ def compress_image(src_path, max_size=800, quality=85):
 
 def add_bait_with_photo_screen(page: ft.Page, on_back):
     selected_photo_path = None
-    photo_path_input = ft.TextField(label="Путь к фото", width=400, read_only=True)
+    photo_preview = ft.Image(width=200, height=200, visible=False)
+    
     name_input = ft.TextField(label="Название насадки*", width=400)
     bait_type_input = ft.TextField(label="Тип", width=200)
     flavor_input = ft.TextField(label="Аромат", width=200)
@@ -48,30 +46,30 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
     notes_input = ft.TextField(label="Заметки", width=400, multiline=True)
     status_text = ft.Text("", color=ft.Colors.BLUE)
 
-    # Гарантированно writable директория для Android
     BAITS_DIR = os.path.join(os.path.dirname(__file__), "data", "baits")
     os.makedirs(BAITS_DIR, exist_ok=True)
 
-    file_picker = ft.FilePicker(on_result=lambda e: on_file_picked(e))
-    page.overlay.append(file_picker)
-
-    def on_file_picked(e: ft.FilePickerResultEvent):
+    def on_camera_image(e):
         nonlocal selected_photo_path
         if e and e.files:
             selected_photo_path = e.files[0].path
-            photo_path_input.value = os.path.basename(selected_photo_path)
-            status_text.value = "✅ Фото выбрано"
+            photo_preview.src = selected_photo_path
+            photo_preview.visible = True
+            status_text.value = "✅ Фото сделано, анализирую..."
             page.update()
+            # Автоматически запускаем анализ
+            analyze_photo_auto()
 
-    def pick_photo(e):
+    def take_photo(e):
         try:
+            file_picker = ft.FilePicker(on_result=on_camera_image)
+            page.overlay.append(file_picker)
             file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)
         except Exception as ex:
-            status_text.value = f"❌ Ошибка выбора: {ex}"
+            status_text.value = f"❌ Ошибка камеры: {ex}"
             page.update()
 
     def save_photo_safely(src_path: str) -> str:
-        """Копирует фото в data/baits/ с уникальным именем"""
         filename = f"bait_{int(datetime.now().timestamp())}.jpg"
         dst_path = os.path.join(BAITS_DIR, filename)
         with open(src_path, 'rb') as src, open(dst_path, 'wb') as dst:
@@ -79,7 +77,6 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         return dst_path
 
     def save_bait(e):
-        nonlocal selected_photo_path
         if not name_input.value.strip():
             status_text.value = "❌ Введите название"
             page.update()
@@ -113,14 +110,14 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         manufacturer_input.value = ""
         season_input.value = ""
         notes_input.value = ""
-        photo_path_input.value = ""
+        photo_preview.visible = False
         selected_photo_path = None
         page.update()
 
-    def analyze_photo(e):
+    def analyze_photo_auto():
         nonlocal selected_photo_path
         if not selected_photo_path:
-            status_text.value = "❌ Сначала выберите фото"
+            status_text.value = "❌ Нет фото для анализа"
             page.update()
             return
 
@@ -135,9 +132,9 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         file_hash = get_file_hash(selected_photo_path)
         if file_hash in analysis_cache:
             analysis = analysis_cache[file_hash]
-            status_text.value = "♻️ Кэш"
+            status_text.value = "♻️ Использую кэш"
         else:
-            status_text.value = "🤖 Анализирую..."
+            status_text.value = "🤖 Анализирую через ИИ..."
             page.update()
             _, openrouter_key = load_keys()
             if not openrouter_key:
@@ -152,7 +149,6 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
         except:
             pass
 
-        # Диалог совета
         def close_advice():
             advice.open = False
             page.overlay.remove(advice)
@@ -187,9 +183,8 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
                 page.update()
 
     back_button = ft.TextButton("← Назад", on_click=lambda e: on_back())
-    pick_button = ft.FilledButton("📷 Выбрать фото", on_click=pick_photo)
+    camera_button = ft.FilledButton("📷 Снять фото", on_click=take_photo)
     save_button = ft.FilledButton("💾 Сохранить", on_click=save_bait)
-    analyze_button = ft.FilledButton("🤖 Распознать", on_click=analyze_photo)
 
     page.controls.clear()
     page.add(
@@ -197,13 +192,13 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
             ft.Container(height=40),
             back_button,
             ft.Text("Добавить насадку", size=28),
-            pick_button,
-            photo_path_input,
+            camera_button,
+            photo_preview,
             name_input,
             ft.Row([bait_type_input, flavor_input], wrap=True),
             ft.Row([manufacturer_input, season_input], wrap=True),
             notes_input,
-            ft.Row([save_button, analyze_button], alignment=ft.MainAxisAlignment.CENTER),
+            save_button,
             status_text,
         ], spacing=15, scroll=ft.ScrollMode.AUTO)
     )
