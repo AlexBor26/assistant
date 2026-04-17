@@ -1,6 +1,5 @@
 import flet as ft
 from storage.database import get_all_baits, add_bait, delete_bait, get_bait_by_id
-from views.add_bait_with_photo import add_bait_with_photo_screen
 
 def baits_screen(page: ft.Page, on_back):
     """Экран управления насадками"""
@@ -107,10 +106,6 @@ def baits_screen(page: ft.Page, on_back):
     refresh_button = ft.TextButton("🔄 Обновить", on_click=lambda e: refresh_baits_list())
     # refresh_button убран - обновление будет при каждом входе
     
-    def open_add_with_photo(e):
-        add_bait_with_photo_screen(page, lambda: baits_screen(page, on_back))
-    
-    add_photo_button = ft.FilledButton("📷 Добавить с фото", on_click=open_add_with_photo)
     
        # ... все определения функций и кнопок ...
     
@@ -130,7 +125,6 @@ def baits_screen(page: ft.Page, on_back):
                 ft.Row([water_temp_input, color_input], wrap=True),
                 notes_input,
                 add_button,
-                add_photo_button,
                 status_text,
                 ft.Divider(),
                 ft.Text("Список насадок:", size=16, weight=ft.FontWeight.BOLD),
