@@ -1,4 +1,5 @@
 import flet as ft
+import flet_camera as fc
 import os
 import shutil
 import json
@@ -49,25 +50,42 @@ def add_bait_with_photo_screen(page: ft.Page, on_back):
     BAITS_DIR = os.path.join(os.path.dirname(__file__), "data", "baits")
     os.makedirs(BAITS_DIR, exist_ok=True)
 
-    def on_camera_image(e):
-        nonlocal selected_photo_path
-        if e and e.files:
-            selected_photo_path = e.files[0].path
-            photo_preview.src = selected_photo_path
-            photo_preview.visible = True
-            status_text.value = "✅ Фото сделано, анализирую..."
-            page.update()
-            # Автоматически запускаем анализ
-            analyze_photo_auto()
-
+    # Кнопка камеры
     def take_photo(e):
-        try:
-            file_picker = ft.FilePicker(on_result=on_camera_image)
-            page.overlay.append(file_picker)
-            file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)
-        except Exception as ex:
-            status_text.value = f"❌ Ошибка камеры: {ex}"
-            page.update()
+        nonlocal selected_photo_path
+        # Запрашиваем разрешения
+        if hasattr(page, 'request_permissions'):
+            page.request_permissions([ft.PermissionType.CAMERA])
+        
+        # Создаём камеру
+        camera = fc.Camera(expand=True)
+        
+        # Кнопка съёмки
+        def capture(e):
+            nonlocal selected_photo_path
+            photo_path = camera.take_photo()
+            if photo_path:
+                selected_photo_path = photo_path
+                photo_preview.src = selected_photo_path
+                photo_preview.visible = True
+                status_text.value = "✅ Фото сделано! Анализирую..."
+                page.close_dialog()
+                page.update()
+                analyze_photo_auto()
+            else:
+                status_text.value = "❌ Не удалось сделать фото"
+                page.update()
+        
+        # Диалог с камерой
+        page.open_dialog(
+            ft.AlertDialog(
+                title=ft.Text("Наведите камеру на упаковку"),
+                content=camera,
+                actions=[ft.ElevatedButton("Снять", on_click=capture)],
+                actions_alignment=ft.MainAxisAlignment.CENTER,
+            )
+        )
+        page.update()
 
     def save_photo_safely(src_path: str) -> str:
         filename = f"bait_{int(datetime.now().timestamp())}.jpg"
