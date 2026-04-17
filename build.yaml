@@ -2,22 +2,25 @@ name: assistant
 version: 1.0.0
 description: Ассистент рыбака
 
-dependencies:
-  flet: ^0.23.0
-
 android:
   package_name: ru.fisher.assistant
   min_sdk_version: 21
   target_sdk_version: 33
   permissions:
     - INTERNET
-    - READ_MEDIA_IMAGES
+    - CAMERA
     - READ_EXTERNAL_STORAGE
     - WRITE_EXTERNAL_STORAGE
+    - READ_MEDIA_IMAGES
+    - READ_MEDIA_VIDEO
+    - MANAGE_EXTERNAL_STORAGE
 
   manifest:
-    - uses-permission: android.permission.READ_MEDIA_IMAGES
+    - uses-permission: android.permission.CAMERA
     - uses-permission: android.permission.READ_EXTERNAL_STORAGE
       max_sdk_version: 32
     - uses-permission: android.permission.WRITE_EXTERNAL_STORAGE
       max_sdk_version: 32
+    - uses-permission: android.permission.READ_MEDIA_IMAGES
+    - uses-feature: android.hardware.camera
+      required: true
