@@ -51,6 +51,21 @@ jobs:
         env:
           CI: "true"
 
+      - name: 🔍 Диагностика - поиск APK
+        run: |
+          echo "=== Поиск всех APK файлов ==="
+          find . -name "*.apk" 2>/dev/null || echo "APK не найдены"
+          echo "=== Содержимое корня ==="
+          ls -la
+          echo "=== Содержимое build ==="
+          ls -la build/ 2>/dev/null || echo "Папка build не существует"
+          echo "=== Содержимое build/apk ==="
+          ls -la build/apk/ 2>/dev/null || echo "Папка build/apk не существует"
+          echo "=== Содержимое build/app ==="
+          ls -la build/app/ 2>/dev/null || echo "Папка build/app не существует"
+          echo "=== Содержимое build/app/outputs ==="
+          ls -la build/app/outputs/ 2>/dev/null || echo "Папка не существует"
+
       - name: 📦 Загрузка артефакта
         uses: actions/upload-artifact@v4
         with:
